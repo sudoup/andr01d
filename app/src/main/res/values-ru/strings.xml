@@ -290,7 +290,7 @@
     <string name="other">Другое</string>
     <string name="options">Параметры</string>
     <string name="general">Общие</string>
-    <string name="multihop">Мультихоп</string>
+    <string name="multihop">Каскад</string>
     <string name="networks">Сети</string>
     <string name="preferred_tunnel_label">Предпочтительный туннель: </string>
     <string name="preferred_tunnel">Предпочтительный туннель</string>
