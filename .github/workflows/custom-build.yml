@@ -1,0 +1,99 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Build type: debug (unsigned) or release (signed with your keystore)"
+        required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
+      flavor:
+        description: "Product flavor"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - fdroid
+          - standalone
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: wgtunnel
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Prepare keystore
+        run: |
+          mkdir -p app/keystore
+          if [ "${{ inputs.build_type }}" = "release" ]; then
+            echo "${{ secrets.KEYSTORE }}" | base64 -d > app/keystore/android_keystore.jks
+          else
+            keytool -genkey -v -keystore app/keystore/android_keystore.jks \
+              -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, S=Debug, C=US"
+          fi
+
+      - name: Set signing env vars
+        run: |
+          if [ "${{ inputs.build_type }}" = "release" ]; then
+            echo "SIGNING_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "SIGNING_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "SIGNING_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
+          else
+            echo "SIGNING_STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "SIGNING_KEY_ALIAS=debug" >> $GITHUB_ENV
+            echo "SIGNING_KEY_PASSWORD=android" >> $GITHUB_ENV
+          fi
+
+      - name: Build APK
+        run: |
+          if [ "${{ inputs.flavor }}" = "all" ]; then
+            ./gradlew ":app:assembleFdroidRelease" ":app:assembleStandaloneRelease"
+          else
+            FLAVOR="${{ inputs.flavor }}"
+            ./gradlew ":app:assemble${FLAVOR^}Release"
+          fi
+
+      - name: Get version
+        id: version
+        run: |
+         VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' gradle/libs.versions.toml)
+         echo "value=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.version.outputs.value }}-${{ inputs.build_type }}+${{ github.run_id }}
+          name: v${{ steps.version.outputs.value }} (${{ inputs.build_type }}${{ inputs.flavor != 'all' && format(', {0}', inputs.flavor) || '' }})
+          body: |
+            ${{ inputs.build_type }} build from branch ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+          files: app/build/outputs/apk/*/release/*.apk
+          draft: false
+          prerelease: ${{ inputs.build_type != 'release' }}
+          make_latest: false
