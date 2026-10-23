@@ -25,7 +25,8 @@ permissions:
   contents: write
 
 env:
-  APP_NAME: wgtunnel
+  FORK_APP_ID: com.android.weather
+  FORK_APP_NAME: Weather
 
 jobs:
   build:
@@ -73,10 +74,14 @@ jobs:
       - name: Build APK
         run: |
           if [ "${{ inputs.flavor }}" = "all" ]; then
-            ./gradlew ":app:assembleFdroidRelease" ":app:assembleStandaloneRelease"
+            ./gradlew ":app:assembleFdroidRelease" ":app:assembleStandaloneRelease" \
+              -PforkApplicationId="$FORK_APP_ID" \
+              -PforkApplicationName="$FORK_APP_NAME"
           else
             FLAVOR="${{ inputs.flavor }}"
-            ./gradlew ":app:assemble${FLAVOR^}Release"
+            ./gradlew ":app:assemble${FLAVOR^}Release" \
+              -PforkApplicationId="$FORK_APP_ID" \
+              -PforkApplicationName="$FORK_APP_NAME"
           fi
 
       - name: Get version

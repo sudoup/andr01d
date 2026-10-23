@@ -30,6 +30,10 @@ licensee {
     }
 }
 
+val forkApplicationId = providers.gradleProperty("forkApplicationId").orNull
+val forkApplicationName = providers.gradleProperty("forkApplicationName").orNull
+val forkProviderPrefix = forkApplicationId ?: Constants.APP_NAME
+
 configure<ApplicationExtension> {
     namespace = Constants.APP_ID
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -55,11 +59,15 @@ configure<ApplicationExtension> {
     }
 
     defaultConfig {
-        applicationId = Constants.APP_ID
+        applicationId = forkApplicationId ?: Constants.APP_ID
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = libs.versions.versionCode.get().toInt()
         versionName = libs.versions.versionName.get()
+
+        if (forkApplicationName != null) {
+            resValue("string", "app_name", forkApplicationName)
+        }
 
         experimentalProperties["android.experimental.disableGitVersion"] = true
 
@@ -100,11 +108,11 @@ configure<ApplicationExtension> {
                 "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName(Constants.RELEASE)
-            manifestPlaceholders["providerAuthority"] = "${Constants.APP_NAME}.provider"
+            manifestPlaceholders["providerAuthority"] = "${forkProviderPrefix}.provider"
             buildConfigField(
                 "String",
                 "FILE_PROVIDER_AUTHORITY",
-                "\"${Constants.APP_NAME}.provider\"",
+                "\"${forkProviderPrefix}.provider\"",
             )
         }
 
@@ -112,11 +120,11 @@ configure<ApplicationExtension> {
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "WG Tunnel Debug")
             isDebuggable = true
-            manifestPlaceholders["providerAuthority"] = "${Constants.APP_NAME}.provider.debug"
+            manifestPlaceholders["providerAuthority"] = "${forkProviderPrefix}.provider.debug"
             buildConfigField(
                 "String",
                 "FILE_PROVIDER_AUTHORITY",
-                "\"${Constants.APP_NAME}.provider.debug\"",
+                "\"${forkProviderPrefix}.provider.debug\"",
             )
         }
 
@@ -124,11 +132,11 @@ configure<ApplicationExtension> {
             initWith(buildTypes.getByName(Constants.RELEASE))
             applicationIdSuffix = ".nightly"
             resValue("string", "app_name", "WG Tunnel Nightly")
-            manifestPlaceholders["providerAuthority"] = "${Constants.APP_NAME}.provider.nightly"
+            manifestPlaceholders["providerAuthority"] = "${forkProviderPrefix}.provider.nightly"
             buildConfigField(
                 "String",
                 "FILE_PROVIDER_AUTHORITY",
-                "\"${Constants.APP_NAME}.provider.nightly\"",
+                "\"${forkProviderPrefix}.provider.nightly\"",
             )
         }
     }
