@@ -7,6 +7,7 @@ import com.wgtunnel.parser.Config
 import com.wgtunnel.parser.ConfigReconciler
 import com.zaneschepke.wireguardautotunnel.R
 import com.zaneschepke.wireguardautotunnel.core.event.TunnelErrorEvent
+import com.zaneschepke.wireguardautotunnel.core.tunnel.StrictSplitDefaults
 import com.zaneschepke.wireguardautotunnel.core.tunnel.TunnelProvider
 import com.zaneschepke.wireguardautotunnel.data.repository.RoomDnsSettingsRepository
 import com.zaneschepke.wireguardautotunnel.domain.enums.TunnelActionSource
@@ -57,6 +58,7 @@ class TunnelCoordinator(
     proxyRepository: ProxySettingsRepository,
     lockdownModeRepository: LockdownSettingsRepository,
     private val appStateRepository: AppStateRepository,
+    private val strictSplitDefaults: StrictSplitDefaults,
     scope: CoroutineScope,
 ) {
 
@@ -144,7 +146,7 @@ class TunnelCoordinator(
                                     payload.monitoring,
                                     payload.general.tunnelScriptingEnabled,
                                     payload.general,
-                                )
+                                ),
                             )
                             .onFailure {
                                 Timber.e(
@@ -157,10 +159,10 @@ class TunnelCoordinator(
                                     GlobalSideEffect.Snackbar(
                                         message =
                                             StringValue.StringResource(
-                                                R.string.active_tunnel_updated
+                                                R.string.active_tunnel_updated,
                                             ),
                                         ToastType.Success,
-                                    )
+                                    ),
                                 )
                             }
                     }
@@ -259,7 +261,7 @@ class TunnelCoordinator(
     ) {
 
         val snapshot = getSnapshot()
-        val settings = snapshot.general
+        var settings = snapshot.general
         val dnsSettings = snapshot.dns
         val proxySettings = snapshot.proxy
         val monitoringSettings = snapshot.monitoring
@@ -288,6 +290,8 @@ class TunnelCoordinator(
             if (policy.hasAnyOverrides) {
                 ConfigReconciler.reconcileConfig(config, globalConfig, policy)
             } else config
+
+        settings = strictSplitDefaults.beforeStart(settings, runConfig)
 
         val tunnelDnsConfig = dnsSettings.toTunnelDnsConfigOrNull(runConfig)
         val outerConfig = resolveOuterConfig(tunnelConfig, globalConfig, policy)
@@ -333,10 +337,10 @@ class TunnelCoordinator(
             )
             .onSuccess {
                 _actions.emit(
-                    TunnelActionEvent.Started(tunnelId = tunnelConfig.id, source = source)
+                    TunnelActionEvent.Started(tunnelId = tunnelConfig.id, source = source),
                 )
                 replaceLastActiveTunnelIds(
-                    tunnelProvider.backendStatus.value.activeTunnels.keys + tunnelConfig.id
+                    tunnelProvider.backendStatus.value.activeTunnels.keys + tunnelConfig.id,
                 )
             }
             .onFailure {
@@ -461,7 +465,7 @@ class TunnelCoordinator(
             .onSuccess {
                 _actions.emit(TunnelActionEvent.Stopped(tunnelId = id, source = source))
                 replaceLastActiveTunnelIds(
-                    tunnelProvider.backendStatus.value.activeTunnels.keys - id
+                    tunnelProvider.backendStatus.value.activeTunnels.keys - id,
                 )
             }
             .onFailure { _errors.emit(TunnelErrorEvent.from(it, id)) }
