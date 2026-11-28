@@ -1,5 +1,6 @@
 package com.zaneschepke.wireguardautotunnel.di
 
+import android.net.NetworkCapabilities
 import com.wgtunnel.backend.ApplicationProvider
 import com.wgtunnel.backend.Backend
 import com.wgtunnel.backend.TunnelBackend
@@ -89,6 +90,12 @@ val tunnelBackendProviderModule = module {
                         .flow
                         .distinctUntilChangedBy { it.wifiDetectionMethod }
                         .map { it.wifiDetectionMethod.to() }
+
+                override val wifiWithoutInternetAsMobile =
+                    get<AutoTunnelSettingsRepository>()
+                        .flow
+                        .distinctUntilChangedBy { it.isWifiWithoutInternetAsMobileEnabled }
+                        .map { it.isWifiWithoutInternetAsMobileEnabled }
             },
             get<CoroutineScope>(named(Scope.APPLICATION)),
         )
@@ -107,6 +114,10 @@ val tunnelBackendProviderModule = module {
                         hasIpv6 = state.hasIpv6,
                         isUsable = state.hasUsableNetwork(),
                         network = state.activeNetwork.network,
+                        isValidated =
+                            state.activeNetwork.capabilities?.hasCapability(
+                                NetworkCapabilities.NET_CAPABILITY_VALIDATED,
+                            ) == true,
                     )
                 }
                 .stateIn(scope = scope, started = SharingStarted.Eagerly, initialValue = null)
